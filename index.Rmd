@@ -1,0 +1,103 @@
+---
+title: "PracticalMachineLearning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Background
+
+It is now possible to collect a large amount of data about personal activity through devices such as Jawbone Up, Nike FuelBand and Fitbit.This assignment uses the data collected from these devices to quantify how well participants performed a certain activity. In the original study, 6 participants were asked to perform barbell lifts in 6 different ways. *Class A* was the correct way, whilst *Class B* asked participants to throw elbows to the front, *Class C* had participants lifting the dumbell only halfway, *Class D* involved lowering the dumbell only halfway and *Class E* was throwing the hips to the front.
+In this assignment we will use data from the study to build a model that will be able to predict whether one is performing the activity correctly or incorrectly.
+
+
+## Loading Packages and reading the data
+
+```{r loading and reading data}
+library(rattle)
+library(caret)
+library(e1071)
+
+setwd("C:/Users/AUgart01/Downloads")
+
+train_df <- read.csv("pml-training.csv",na.strings = c("NA",""))
+testing_df <- read.csv("pml-testing.csv",na.strings = c("NA",""))
+
+head(train_df,5)
+dim(train_df)
+
+```
+
+## Cleaning the Data
+
+From the *head* function we can see that there a large number of NAs in the data. We can also see that the first few columns in our dataset relate to the participants and the time which are all irrelevant to the analysis. 
+
+```{r clean, echo=TRUE}
+train_df <- train_df[,colSums(is.na(train_df))==0]
+train_df[,1:7] <- NULL
+dim(train_df)
+
+
+testing_df <- testing_df[,colSums(is.na(testing_df))==0]
+testing_df[,1:7] <- NULL
+dim(testing_df)
+```
+
+Each data set now contains 53 columns without any missing or irrelevant data so we can start to create our model.
+
+##Partioning the Data
+
+We first set the seed and then partition the data into a training data set (we will use 70% of the original data for this) and testing data set (the remaining 30%).
+```{r partition, echo=TRUE}
+set.seed(345)
+inTrain = createDataPartition(train_df$classe,p=0.7)[[1]]
+training = train_df[inTrain,]
+testing = train_df[-inTrain,]
+
+```
+
+##Modelling the data - decision trees
+
+In order to evaluate the model's predictive performance we will use cross validation. This will partition the original training sample into a traininng set that will train the model and a test set that will evaluate it. This is repeated k times, the results will then be averaged to produce a single prediction.
+In k-fold cross validation the samples are randomly partitioned and are roughly of equal size. For this assignment we will use 5 folds.
+The first method we will use is *rpart*.
+
+```{r model_1, echo=TRUE}
+crossv <- trainControl(method="cv", number=5)
+model_1 <- train(classe~., data=training, method="rpart", trControl=crossv)
+model_1
+fancyRpartPlot(model_1$finalModel)
+predict_1 <- predict(model_1, testing)
+```
+
+Above, we use model_1 to predict the class for the test data set. We will then look at the accuracy of our model using a confusion matrix.
+
+```{r confusion_1, echo=TRUE}
+confusionMatrix(testing$classe, predict_1)
+```
+From this we can see that accuracy is quite low; 0.4918
+
+##Modelling 2 - Random Forest
+
+This time we will use method *rf* or random forests for our model.
+
+```{r model_2, echo=TRUE}
+crossv_1 <- trainControl(method="cv", 5)
+model_2 <- train(classe ~ ., data=training, method="rf", trControl=crossv_1)
+model_2
+predict_2 <- predict(model_2, testing)
+confusionMatrix(testing$classe, predict_2)
+```
+
+From the confusion matrix we can see that this model is more accurate: 0.09934
+
+```{r out of sample, echo=TRUE}
+out_error <- 1-0.9934
+out_error
+```
+Finally we look out our out of sample error which appears to be small.
+
+##Conclusion
+From the above analysis it seems that the random forests model is able to predict the class of our test data more accurately than the rpart model.
